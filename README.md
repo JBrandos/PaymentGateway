@@ -15,7 +15,22 @@ RESTful API that allows merchants to process a card payment
 ## How to use
 - Clone repository and open solution in IDE
 - Check appsettings.Development.json ConnectionStrings:PaymentsDb is pointing to your localdb
-- Run the PaymentGateway.API as startup project (Not in IIS)
+- Add the following table to your localdb:
+`USE [PaymentsGateway]
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[PaymentEvents](
+	[EventId] [uniqueidentifier] NOT NULL,
+	[PaymentId] [uniqueidentifier] NOT NULL,
+	[EventType] [nvarchar](50) NOT NULL,
+	[EventData] [nvarchar](max) NOT NULL,
+	[CreatedDateTimeUtc] [datetimeoffset](7) NOT NULL
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO`
+- Run the PaymentGateway.API as startup project
 - Swagger doc should load, server should start 
 - **To authenticate requests**, ensure the header contains key:value ApiKey:SuperSecretKey 
 - Requests are:
@@ -62,7 +77,7 @@ The api is structured so that data is stored as events. This means that when a m
 If I had more knowledge and time...
 ### Security
 Currently the api is not ready for production because it has security concerns like:
- - Weak authentication: ApiKey authentication is not ideal because if the secret was revealed - which it has been by me checking in my _appsettings.Development.json_ - then everyone could access the apis functionality. The next step would be to use something like JWT tokens or an identity provider solution.
+ - Weak authentication: ApiKey authentication is not ideal because if the secret was revealed - which it has been by me checking in my _appsettings.Development.json_ - then everyone could access the apis functionality. The next step would be to use something like JWT tokens or an identity provider solution, we could also then attribute an identity to the Merchant data which is currently hardcoded as Amazon
  - Poor storage and handling of sensitive information: The card details are currently stored as plain-text in a database. Im sure there is plenty of regulation on this topic and at a minimum that information should be hashed and salted. Whilst looking into it I also found "SecureString" which is a safer way of handling strings that contain sensitive information in code and would be beneficial in the case of an attack  
 ### Messaging System
 Resiliency is particularly important when dealing with fast important and sensitive data. This aspect could be improved with a messaging system so that when the api receives a new payment, its added to a queue so its no longer reliant on the api maintaining its availability - it could have downtime and the payment be read by another api.
@@ -70,3 +85,5 @@ Resiliency is particularly important when dealing with fast important and sensit
 There are no integration tests and the unit tests could definitely be improved in terms of the cases they cover and the code itself made cleaner. Minimal performance testing has been done using Postmans "runner" tool. Running 100 tests one after the other it maintains a low delay 10-15ms for both requests, but results may be very different if many requests came at once.
 ### Cache recently made payments
 In this use case it seems like caching recent orders for a few seconds (or however long its expected to take for the bank to respond) would greatly improve performance because clients are expected to keep querying until they get BankValidated and so the same payment is reconstructed from the payment events repeatedly. Caching would fix this because on query we could first check the cache for recent payments rather than connecting to the db, reading, constructing and then sending the response back.
+### Other
+Explore other datastores, application metrics being pushed to a service like Datadog, an actual build pipeline & containerization, validation on payment details could be improved 
